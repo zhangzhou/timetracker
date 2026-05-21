@@ -1,0 +1,987 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#2563eb">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>时间追踪 - Time Tracker</title>
+    <link rel="manifest" href="data:application/json;base64,eyJuYW1lIjogIuW8gOWPkeaWmeacuuaciemZkOWFrOWbvSIsICJzaG9ydF9uYW1lIjogIuW8gOWPkeaWmeacuiIsICJzdGFydF91cmwiOiAiLiIsICJkaXNwbGF5IjogInN0YW5kYWxvbmUiLCAiYmFja2dyb3VuZF9jb2xvciI6ICIjZmZmZmZmIiwgInRoZW1lX2NvbG9yIjogIiMyNTYzZWIifQ==">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<!-- 若需完全离线，下载 chart.js 到同级目录并替换上方 CDN 链接 -->
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root { 
+            --primary: #2563eb; --primary-dark: #1d4ed8; --secondary: #64748b; 
+            --success: #10b981; --warning: #f59e0b; --danger: #ef4444; 
+            --bg: #f8fafc; --card: #ffffff; --text: #1e293b; --text-light: #64748b;
+            --border: #e2e8f0; --shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; -webkit-tap-highlight-color: transparent; }
+        .app { max-width: 480px; margin: 0 auto; min-height: 100vh; display: flex; flex-direction: column; }
+        .header { background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%); color: white; padding: 20px; text-align: center; position: sticky; top: 0; z-index: 100; }
+        .header h1 { font-size: 1.4rem; font-weight: 600; }
+        .header .subtitle { font-size: 0.85rem; opacity: 0.9; margin-top: 4px; }
+        .timer-display { background: rgba(255,255,255,0.15); border-radius: 12px; padding: 12px 20px; margin-top: 12px; display: inline-flex; align-items: center; gap: 8px; backdrop-filter: blur(10px); }
+        .timer-display .time { font-size: 1.6rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+        .timer-display .label { font-size: 0.8rem; opacity: 0.85; }
+        .content { flex: 1; padding: 16px; overflow-y: auto; }
+        .card { background: var(--card); border-radius: 16px; padding: 20px; margin-bottom: 16px; box-shadow: var(--shadow); border: 1px solid var(--border); }
+        .card-title { font-size: 1rem; font-weight: 600; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+        .card-title .icon { width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; background: var(--primary); color: white; border-radius: 6px; font-size: 14px; }
+        .form-group { margin-bottom: 16px; }
+        .form-group label { display: block; font-size: 0.875rem; font-weight: 500; margin-bottom: 6px; color: var(--text); }
+        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 12px 14px; border: 2px solid var(--border); border-radius: 10px; font-size: 1rem; font-family: inherit; transition: border-color 0.2s; background: white; }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus { outline: none; border-color: var(--primary); }
+        .form-group textarea { resize: vertical; min-height: 80px; }
+        .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 12px 24px; border: none; border-radius: 10px; font-size: 1rem; font-weight: 600; cursor: pointer; transition: all 0.2s; width: 100%; }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:active { transform: scale(0.98); background: var(--primary-dark); }
+        .btn-secondary { background: var(--bg); color: var(--text); border: 2px solid var(--border); }
+        .btn-success { background: var(--success); color: white; }
+        .btn-danger { background: var(--danger); color: white; }
+        .btn-sm { padding: 8px 16px; font-size: 0.875rem; width: auto; }
+        .category-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 16px; }
+        .category-btn { padding: 10px 8px; border: 2px solid var(--border); border-radius: 10px; background: white; cursor: pointer; text-align: center; font-size: 0.85rem; font-weight: 500; transition: all 0.2s; }
+        .category-btn.active { border-color: var(--primary); background: #eff6ff; color: var(--primary); }
+        .category-btn:active { transform: scale(0.95); }
+        .records-list { max-height: 400px; overflow-y: auto; }
+        .record-item { display: flex; align-items: flex-start; gap: 12px; padding: 14px; border-radius: 12px; background: var(--bg); margin-bottom: 8px; border-left: 4px solid var(--primary); }
+        .record-item .time-block { min-width: 70px; text-align: center; }
+        .record-item .time-block .period { font-size: 0.75rem; color: var(--text-light); font-weight: 500; }
+        .record-item .time-block .duration { font-size: 0.85rem; color: var(--primary); font-weight: 600; margin-top: 2px; }
+        .record-item .content { flex: 1; padding: 0; }
+        .record-item .content .activity { font-weight: 500; font-size: 0.95rem; word-break: break-word; }
+        .record-item .content .category-tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; background: #e0e7ff; color: var(--primary); margin-top: 4px; font-weight: 500; }
+        .record-item .actions { display: flex; gap: 6px; }
+        .record-item .actions button { padding: 4px 8px; border: none; background: transparent; color: var(--text-light); cursor: pointer; border-radius: 4px; font-size: 0.8rem; }
+        .record-item .actions button:hover { background: var(--border); color: var(--danger); }
+        .stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 16px; }
+        .stat-box { background: var(--bg); padding: 16px; border-radius: 12px; text-align: center; }
+        .stat-box .value { font-size: 1.5rem; font-weight: 700; color: var(--primary); }
+        .stat-box .label { font-size: 0.8rem; color: var(--text-light); margin-top: 4px; }
+        .chart-container { position: relative; height: 250px; margin: 16px 0; }
+        .empty-state { text-align: center; padding: 40px 20px; color: var(--text-light); }
+        .empty-state .icon { font-size: 3rem; margin-bottom: 12px; opacity: 0.5; }
+        .tabs { display: flex; gap: 4px; margin-bottom: 16px; background: var(--bg); padding: 4px; border-radius: 10px; }
+        .tab { flex: 1; padding: 10px; border: none; background: transparent; border-radius: 8px; font-size: 0.875rem; font-weight: 500; cursor: pointer; color: var(--text-light); transition: all 0.2s; }
+        .tab.active { background: white; color: var(--primary); box-shadow: var(--shadow); }
+        .bottom-nav { display: flex; background: var(--card); border-top: 1px solid var(--border); padding: 8px 0; position: sticky; bottom: 0; z-index: 100; }
+        .nav-item { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px; border: none; background: transparent; color: var(--text-light); font-size: 0.7rem; cursor: pointer; transition: color 0.2s; }
+        .nav-item .nav-icon { font-size: 1.3rem; }
+        .nav-item.active { color: var(--primary); }
+        .nav-item:active { opacity: 0.7; }
+        .page { display: none; }
+        .page.active { display: block; animation: fadeIn 0.3s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .badge { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 10px; font-size: 0.75rem; font-weight: 600; }
+        .badge-success { background: #d1fae5; color: #065f46; }
+        .badge-warning { background: #fef3c7; color: #92400e; }
+        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 1000; padding: 20px; }
+        .modal-overlay.active { display: flex; }
+        .modal { background: var(--card); border-radius: 20px; padding: 24px; width: 100%; max-width: 400px; max-height: 90vh; overflow-y: auto; animation: modalIn 0.3s ease; }
+        @keyframes modalIn { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .modal-header h3 { font-size: 1.1rem; }
+        .modal-close { width: 32px; height: 32px; border: none; background: var(--bg); border-radius: 50%; cursor: pointer; font-size: 1.2rem; color: var(--text-light); }
+        .switch { position: relative; display: inline-block; width: 50px; height: 28px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background: var(--border); transition: 0.3s; border-radius: 28px; }
+        .slider:before { position: absolute; content: ""; height: 22px; width: 22px; left: 3px; bottom: 3px; background: white; transition: 0.3s; border-radius: 50%; }
+        input:checked + .slider { background: var(--primary); }
+        input:checked + .slider:before { transform: translateX(22px); }
+        .setting-row { display: flex; justify-content: space-between; align-items: center; padding: 14px 0; border-bottom: 1px solid var(--border); }
+        .setting-row:last-child { border-bottom: none; }
+        .toast { position: fixed; top: 20px; left: 50%; transform: translateX(-50%) translateY(-100px); background: var(--text); color: white; padding: 12px 24px; border-radius: 10px; font-size: 0.9rem; z-index: 2000; transition: transform 0.3s ease; box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
+        .toast.show { transform: translateX(-50%) translateY(0); }
+        .progress-ring { width: 60px; height: 60px; }
+        .progress-ring circle { fill: none; stroke-width: 4; }
+        .progress-ring .bg { stroke: rgba(255,255,255,0.2); }
+        .progress-ring .progress { stroke: white; stroke-linecap: round; transform: rotate(-90deg); transform-origin: 50% 50%; transition: stroke-dashoffset 1s linear; }
+        .quick-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+        .quick-tag { padding: 6px 12px; border: 1px solid var(--border); border-radius: 20px; background: white; font-size: 0.8rem; cursor: pointer; transition: all 0.2s; }
+        .quick-tag:hover { border-color: var(--primary); color: var(--primary); background: #eff6ff; }
+        .filter-bar { display: flex; gap: 8px; margin-bottom: 16px; overflow-x: auto; padding-bottom: 4px; }
+        .filter-chip { padding: 6px 14px; border: 1px solid var(--border); border-radius: 20px; background: white; font-size: 0.85rem; cursor: pointer; white-space: nowrap; transition: all 0.2s; }
+        .filter-chip.active { background: var(--primary); color: white; border-color: var(--primary); }
+        @media (max-width: 380px) { .category-grid { grid-template-columns: repeat(2, 1fr); } .stats-grid { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+<div class="app">
+    <div class="header">
+        <h1>⏱️ 时间追踪</h1>
+        <div class="subtitle">记录每一刻，掌控你的时间</div>
+        <div class="timer-display" id="timerDisplay">
+            <span class="label">下次提醒</span>
+            <span class="time" id="countdown">--:--</span>
+        </div>
+    </div>
+
+    <div class="content">
+        <!-- 记录页 -->
+        <div class="page active" id="page-record">
+            <div class="card">
+                <div class="card-title"><span class="icon">📝</span>记录当前时段</div>
+                <div class="form-group">
+                    <label>时间段</label>
+                    <input type="text" id="periodLabel" readonly style="background: var(--bg); font-weight: 600; color: var(--primary);">
+                </div>
+                <div class="form-group">
+                    <label>选择分类</label>
+                    <div class="category-grid" id="categoryGrid">
+                        <button class="category-btn active" data-cat="工作">💼 工作</button>
+                        <button class="category-btn" data-cat="学习">📚 学习</button>
+                        <button class="category-btn" data-cat="休息">☕ 休息</button>
+                        <button class="category-btn" data-cat="运动">🏃 运动</button>
+                        <button class="category-btn" data-cat="娱乐">🎮 娱乐</button>
+                        <button class="category-btn" data-cat="其他">📌 其他</button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>这段时间做了什么？</label>
+                    <div class="quick-actions" id="quickActions"></div>
+                    <textarea id="activityInput" placeholder="例如：完成了项目报告的前三章..."></textarea>
+                </div>
+                <button class="btn btn-primary" id="saveBtn" onclick="saveRecord()">
+                    <span>💾</span> 保存记录
+                </button>
+            </div>
+
+            <div class="card">
+                <div class="card-title"><span class="icon">📋</span>今日记录 <span class="badge badge-success" id="todayCount">0 条</span></div>
+                <div class="records-list" id="recordsList">
+                    <div class="empty-state">
+                        <div class="icon">📭</div>
+                        <div>还没有记录，开始你的第一条时间记录吧！</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 分析页 -->
+        <div class="page" id="page-analyze">
+            <div class="card">
+                <div class="card-title"><span class="icon">📊</span>时间统计</div>
+                <div class="tabs">
+                    <button class="tab active" onclick="setPeriod('today')">今日</button>
+                    <button class="tab" onclick="setPeriod('week')">本周</button>
+                    <button class="tab" onclick="setPeriod('month')">本月</button>
+                </div>
+                <div class="stats-grid" id="statsGrid">
+                    <div class="stat-box"><div class="value" id="statTotal">0h</div><div class="label">记录时长</div></div>
+                    <div class="stat-box"><div class="value" id="statCount">0</div><div class="label">记录条数</div></div>
+                    <div class="stat-box"><div class="value" id="statTop">-</div><div class="label">主要分类</div></div>
+                    <div class="stat-box"><div class="value" id="statEff">0%</div><div class="label">记录效率</div></div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title"><span class="icon">🥧</span>时间分布</div>
+                <div class="chart-container"><canvas id="pieChart"></canvas></div>
+            </div>
+
+            <div class="card">
+                <div class="card-title"><span class="icon">📈</span>趋势分析</div>
+                <div class="chart-container"><canvas id="barChart"></canvas></div>
+            </div>
+
+            <div class="card">
+                <div class="card-title"><span class="icon">🏷️</span>分类详情</div>
+                <div id="categoryDetails"></div>
+            </div>
+        </div>
+
+        <!-- 历史页 -->
+        <div class="page" id="page-history">
+            <div class="card">
+                <div class="card-title"><span class="icon">📚</span>历史记录</div>
+                <div class="filter-bar">
+                    <button class="filter-chip active" onclick="filterHistory('all')">全部</button>
+                    <button class="filter-chip" onclick="filterHistory('work')">工作</button>
+                    <button class="filter-chip" onclick="filterHistory('study')">学习</button>
+                    <button class="filter-chip" onclick="filterHistory('rest')">休息</button>
+                </div>
+                <div class="records-list" id="historyList">
+                    <div class="empty-state"><div class="icon">📭</div><div>暂无历史记录</div></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 设置页 -->
+        <div class="page" id="page-settings">
+            <div class="card">
+                <div class="card-title"><span class="icon">⚙️</span>提醒设置</div>
+                <div class="setting-row">
+                    <div><div style="font-weight:500">启用提醒</div><div style="font-size:0.8rem;color:var(--text-light)">定时通知记录时间</div></div>
+                    <label class="switch"><input type="checkbox" id="notifyToggle" checked onchange="toggleNotify()"><span class="slider"></span></label>
+                </div>
+                <div class="setting-row">
+                    <div><div style="font-weight:500">提醒间隔</div><div style="font-size:0.8rem;color:var(--text-light)">选择记录频率</div></div>
+                    <select id="intervalSelect" onchange="changeInterval()" style="width:auto;padding:6px 12px;">
+                        <option value="15">15 分钟</option>
+                        <option value="30" selected>30 分钟</option>
+                        <option value="45">45 分钟</option>
+                        <option value="60">60 分钟</option>
+                    </select>
+                </div>
+                <div class="setting-row">
+                    <div><div style="font-weight:500">浏览器通知</div><div style="font-size:0.8rem;color:var(--text-light)">允许桌面/锁屏通知</div></div>
+                    <button class="btn btn-sm btn-secondary" onclick="requestNotifyPermission()">请求权限</button>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title"><span class="icon">💾</span>数据管理</div>
+                <div style="display:flex;gap:8px;flex-direction:column;">
+                    <button class="btn btn-secondary" onclick="exportData('json')">📥 导出 JSON 备份</button>
+                    <button class="btn btn-secondary" onclick="exportData('csv')">📄 导出 CSV 表格</button>
+                    <button class="btn btn-secondary" onclick="document.getElementById('importFile').click()">📤 导入 JSON 备份</button>
+                    <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(this)">
+                    <button class="btn btn-danger" onclick="clearAllData()">🗑️ 清空所有数据</button>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title"><span class="icon">ℹ️</span>关于</div>
+                <div style="font-size:0.9rem;color:var(--text-light);line-height:1.8;">
+                    <p>⏱️ <strong>时间追踪</strong> - 本地优先的时间记录工具</p>
+                    <p>🔒 数据完全存储在本地，保护隐私</p>
+                    <p>📱 可添加到主屏幕作为 APP 使用</p>
+                    <p>🌐 首次图表加载需要联网（CDN）</p>
+                    <p style="margin-top:8px;font-size:0.8rem;">版本 1.0 | 离线可用</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="bottom-nav">
+        <button class="nav-item active" onclick="switchPage('record')">
+            <span class="nav-icon">📝</span>
+            <span>记录</span>
+        </button>
+        <button class="nav-item" onclick="switchPage('analyze')">
+            <span class="nav-icon">📊</span>
+            <span>分析</span>
+        </button>
+        <button class="nav-item" onclick="switchPage('history')">
+            <span class="nav-icon">📚</span>
+            <span>历史</span>
+        </button>
+        <button class="nav-item" onclick="switchPage('settings')">
+            <span class="nav-icon">⚙️</span>
+            <span>设置</span>
+        </button>
+    </div>
+</div>
+
+<div class="modal-overlay" id="editModal">
+    <div class="modal">
+        <div class="modal-header"><h3>✏️ 编辑记录</h3><button class="modal-close" onclick="closeModal()">×</button></div>
+        <div class="form-group">
+            <label>分类</label>
+            <select id="editCategory">
+                <option value="工作">💼 工作</option>
+                <option value="学习">📚 学习</option>
+                <option value="休息">☕ 休息</option>
+                <option value="运动">🏃 运动</option>
+                <option value="娱乐">🎮 娱乐</option>
+                <option value="其他">📌 其他</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>活动内容</label>
+            <textarea id="editActivity" rows="3"></textarea>
+        </div>
+        <button class="btn btn-primary" onclick="saveEdit()">保存修改</button>
+    </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ==================== 数据存储 ====================
+const DB_NAME = 'TimeTrackerDB';
+const DB_VERSION = 1;
+const STORE_NAME = 'records';
+let db = null;
+let currentEditId = null;
+let pieChartInstance = null;
+let barChartInstance = null;
+let currentPeriod = 'today';
+let currentFilter = 'all';
+
+const state = {
+    intervalMinutes: 30,
+    notifications: true,
+    nextReminder: null,
+    timerInterval: null
+};
+
+// 常用活动快捷标签
+const quickTags = {
+    '工作': ['邮件处理', '会议', '编程', '写作', '数据分析', '客户沟通', '文档整理'],
+    '学习': ['阅读', '网课', '笔记整理', '论文写作', '考试复习', '技能练习'],
+    '休息': ['午休', '冥想', '散步', '用餐', '小憩'],
+    '运动': ['跑步', '健身', '瑜伽', '游泳', '球类运动'],
+    '娱乐': ['刷视频', '游戏', '社交', '追剧', '音乐'],
+    '其他': ['通勤', '家务', '购物', '个人事务']
+};
+
+function initDB() {
+    return new Promise((resolve, reject) => {
+        const request = indexedDB.open(DB_NAME, DB_VERSION);
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => { db = request.result; resolve(db); };
+        request.onupgradeneeded = (e) => {
+            const db = e.target.result;
+            if (!db.objectStoreNames.contains(STORE_NAME)) {
+                const store = db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+                store.createIndex('periodStart', 'periodStart', { unique: false });
+                store.createIndex('category', 'category', { unique: false });
+            }
+        };
+    });
+}
+
+function addRecord(record) {
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction([STORE_NAME], 'readwrite');
+        const store = tx.objectStore(STORE_NAME);
+        const request = store.add(record);
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject(request.error);
+    });
+}
+
+function updateRecord(record) {
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction([STORE_NAME], 'readwrite');
+        const store = tx.objectStore(STORE_NAME);
+        const request = store.put(record);
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject(request.error);
+    });
+}
+
+function deleteRecord(id) {
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction([STORE_NAME], 'readwrite');
+        const store = tx.objectStore(STORE_NAME);
+        const request = store.delete(id);
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject(request.error);
+    });
+}
+
+function getAllRecords() {
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction([STORE_NAME], 'readonly');
+        const store = tx.objectStore(STORE_NAME);
+        const request = store.getAll();
+        request.onsuccess = () => resolve(request.result.sort((a,b) => new Date(b.periodStart) - new Date(a.periodStart)));
+        request.onerror = () => reject(request.error);
+    });
+}
+
+// ==================== 核心功能 ====================
+function getNextReminder() {
+    const now = new Date();
+    const interval = state.intervalMinutes;
+    const minutes = now.getMinutes();
+    const nextSlot = Math.ceil(minutes / interval) * interval;
+    const next = new Date(now);
+    next.setMinutes(nextSlot, 0, 0);
+    if (nextSlot >= 60) {
+        next.setHours(next.getHours() + 1, nextSlot - 60, 0, 0);
+    }
+    if (next <= now) {
+        next.setMinutes(next.getMinutes() + interval);
+    }
+    return next.getTime();
+}
+
+function updateCountdown() {
+    const now = Date.now();
+    if (!state.nextReminder) state.nextReminder = getNextReminder();
+
+    const diff = state.nextReminder - now;
+    if (diff <= 0) {
+        state.nextReminder = getNextReminder();
+        if (state.notifications) sendNotification();
+        updatePeriodLabel();
+    }
+
+    const mins = Math.floor(diff / 60000);
+    const secs = Math.floor((diff % 60000) / 1000);
+    document.getElementById('countdown').textContent = 
+        `${String(mins).padStart(2,'0')}:${String(secs).padStart(2,'0')}`;
+}
+
+function sendNotification() {
+    if ('Notification' in window && Notification.permission === 'granted') {
+        new Notification('⏱️ 时间追踪提醒', {
+            body: `该记录 ${state.intervalMinutes} 分钟前的活动了！`,
+            icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">⏱️</text></svg>',
+            badge: '⏱️',
+            tag: 'time-tracker'
+        });
+    }
+    playBeep();
+    showToast('⏰ 提醒时间到了！请记录这段时间的活动');
+}
+
+function playBeep() {
+    try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.frequency.value = 880;
+        gain.gain.value = 0.3;
+        osc.start();
+        osc.stop(ctx.currentTime + 0.2);
+        setTimeout(() => {
+            const osc2 = ctx.createOscillator();
+            const gain2 = ctx.createGain();
+            osc2.connect(gain2);
+            gain2.connect(ctx.destination);
+            osc2.frequency.value = 1100;
+            gain2.gain.value = 0.3;
+            osc2.start();
+            osc2.stop(ctx.currentTime + 0.2);
+        }, 250);
+    } catch(e) { console.log('Audio not available'); }
+}
+
+function updatePeriodLabel() {
+    const now = new Date();
+    const interval = state.intervalMinutes;
+    const currentSlot = Math.floor(now.getMinutes() / interval) * interval;
+    const start = new Date(now);
+    start.setMinutes(currentSlot, 0, 0);
+    const end = new Date(start);
+    end.setMinutes(end.getMinutes() + interval);
+
+    const fmt = d => `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+    document.getElementById('periodLabel').value = `${fmt(start)} - ${fmt(end)}`;
+}
+
+function getCurrentPeriod() {
+    const now = new Date();
+    const interval = state.intervalMinutes;
+    const currentSlot = Math.floor(now.getMinutes() / interval) * interval;
+    const start = new Date(now);
+    start.setMinutes(currentSlot, 0, 0);
+    const end = new Date(start);
+    end.setMinutes(end.getMinutes() + interval);
+    return { start: start.toISOString(), end: end.toISOString() };
+}
+
+// ==================== UI 交互 ====================
+let selectedCategory = '工作';
+
+function initCategoryButtons() {
+    const grid = document.getElementById('categoryGrid');
+    grid.querySelectorAll('.category-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            grid.querySelectorAll('.category-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            selectedCategory = btn.dataset.cat;
+            updateQuickTags();
+        });
+    });
+    updateQuickTags();
+}
+
+function updateQuickTags() {
+    const container = document.getElementById('quickActions');
+    const tags = quickTags[selectedCategory] || [];
+    container.innerHTML = tags.map(tag => 
+        `<button class="quick-tag" onclick="document.getElementById('activityInput').value='${tag}'">${tag}</button>`
+    ).join('');
+}
+
+async function saveRecord() {
+    const activity = document.getElementById('activityInput').value.trim();
+    if (!activity) {
+        showToast('❌ 请输入活动内容');
+        return;
+    }
+
+    const period = getCurrentPeriod();
+    const record = {
+        id: Date.now().toString(36) + Math.random().toString(36).substr(2, 5),
+        periodStart: period.start,
+        periodEnd: period.end,
+        recordedAt: new Date().toISOString(),
+        activity: activity,
+        category: selectedCategory
+    };
+
+    await androidDB.addRecord(record);
+    document.getElementById('activityInput').value = '';
+    showToast('✅ 记录保存成功！');
+    loadTodayRecords();
+    updateStats();
+}
+
+async function loadTodayRecords() {
+    const records = await androidDB.getAllRecords();
+    const today = new Date().toDateString();
+    const todayRecords = records.filter(r => new Date(r.periodStart).toDateString() === today);
+
+    document.getElementById('todayCount').textContent = `${todayRecords.length} 条`;
+    const list = document.getElementById('recordsList');
+
+    if (todayRecords.length === 0) {
+        list.innerHTML = `<div class="empty-state"><div class="icon">📭</div><div>还没有记录，开始你的第一条时间记录吧！</div></div>`;
+        return;
+    }
+
+    list.innerHTML = todayRecords.map(r => {
+        const s = new Date(r.periodStart);
+        const e = new Date(r.periodEnd);
+        const fmt = d => `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+        const duration = ((e - s) / 3600000).toFixed(1);
+        return `
+            <div class="record-item">
+                <div class="time-block">
+                    <div class="period">${fmt(s)}-${fmt(e)}</div>
+                    <div class="duration">${duration}h</div>
+                </div>
+                <div class="content">
+                    <div class="activity">${escapeHtml(r.activity)}</div>
+                    <span class="category-tag">${r.category}</span>
+                </div>
+                <div class="actions">
+                    <button onclick="editRecord('${r.id}')">编辑</button>
+                    <button onclick="deleteRecordById('${r.id}')">删除</button>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+async function loadHistory() {
+    const records = await androidDB.getAllRecords();
+    const list = document.getElementById('historyList');
+
+    let filtered = records;
+    if (currentFilter !== 'all') {
+        const map = {'work':'工作','study':'学习','rest':'休息','sport':'运动','ent':'娱乐'};
+        filtered = records.filter(r => r.category === (map[currentFilter] || currentFilter));
+    }
+
+    if (filtered.length === 0) {
+        list.innerHTML = `<div class="empty-state"><div class="icon">📭</div><div>该分类下暂无记录</div></div>`;
+        return;
+    }
+
+    list.innerHTML = filtered.map(r => {
+        const s = new Date(r.periodStart);
+        const e = new Date(r.periodEnd);
+        const fmt = d => `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+        const dateStr = `${s.getMonth()+1}/${s.getDate()}`;
+        const duration = ((e - s) / 3600000).toFixed(1);
+        return `
+            <div class="record-item">
+                <div class="time-block">
+                    <div class="period">${dateStr}</div>
+                    <div class="duration">${fmt(s)}-${fmt(e)}</div>
+                </div>
+                <div class="content">
+                    <div class="activity">${escapeHtml(r.activity)}</div>
+                    <span class="category-tag">${r.category}</span>
+                </div>
+                <div class="actions">
+                    <button onclick="editRecord('${r.id}')">编辑</button>
+                    <button onclick="deleteRecordById('${r.id}')">删除</button>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function filterHistory(type) {
+    currentFilter = type;
+    document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+    event.target.classList.add('active');
+    loadHistory();
+}
+
+async function editRecord(id) {
+    const records = await androidDB.getAllRecords();
+    const record = records.find(r => r.id === id);
+    if (!record) return;
+
+    currentEditId = id;
+    document.getElementById('editCategory').value = record.category;
+    document.getElementById('editActivity').value = record.activity;
+    document.getElementById('editModal').classList.add('active');
+}
+
+async function saveEdit() {
+    if (!currentEditId) return;
+    const records = await androidDB.getAllRecords();
+    const record = records.find(r => r.id === currentEditId);
+    if (!record) return;
+
+    record.category = document.getElementById('editCategory').value;
+    record.activity = document.getElementById('editActivity').value;
+    await androidDB.updateRecord(record);
+
+    closeModal();
+    showToast('✅ 修改已保存');
+    loadTodayRecords();
+    loadHistory();
+    updateStats();
+}
+
+function closeModal() {
+    document.getElementById('editModal').classList.remove('active');
+    currentEditId = null;
+}
+
+async function deleteRecordById(id) {
+    if (!confirm('确定要删除这条记录吗？')) return;
+    await deleteRecord(id);
+    showToast('🗑️ 记录已删除');
+    loadTodayRecords();
+    loadHistory();
+    updateStats();
+}
+
+// ==================== 统计分析 ====================
+function setPeriod(p) {
+    currentPeriod = p;
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    event.target.classList.add('active');
+    updateStats();
+}
+
+async function updateStats() {
+    const records = await androidDB.getAllRecords();
+    const now = new Date();
+    let filtered = [];
+
+    if (currentPeriod === 'today') {
+        filtered = records.filter(r => new Date(r.periodStart).toDateString() === now.toDateString());
+    } else if (currentPeriod === 'week') {
+        const weekAgo = new Date(now - 7 * 86400000);
+        filtered = records.filter(r => new Date(r.periodStart) >= weekAgo);
+    } else {
+        const monthAgo = new Date(now - 30 * 86400000);
+        filtered = records.filter(r => new Date(r.periodStart) >= monthAgo);
+    }
+
+    const totalHours = filtered.reduce((sum, r) => {
+        const duration = (new Date(r.periodEnd) - new Date(r.periodStart)) / 3600000;
+        return sum + duration;
+    }, 0);
+
+    const catStats = {};
+    filtered.forEach(r => {
+        const duration = (new Date(r.periodEnd) - new Date(r.periodStart)) / 3600000;
+        catStats[r.category] = (catStats[r.category] || 0) + duration;
+    });
+
+    const topCat = Object.entries(catStats).sort((a,b) => b[1]-a[1])[0];
+
+    // 效率 = 实际记录数 / 理想记录数
+    const days = currentPeriod === 'today' ? 1 : (currentPeriod === 'week' ? 7 : 30);
+    const wakeHours = 16;
+    const idealRecords = Math.floor((days * wakeHours * 60) / state.intervalMinutes);
+    const efficiency = Math.min(100, Math.round((filtered.length / idealRecords) * 100));
+
+    document.getElementById('statTotal').textContent = totalHours.toFixed(1) + 'h';
+    document.getElementById('statCount').textContent = filtered.length;
+    document.getElementById('statTop').textContent = topCat ? topCat[0] : '-';
+    document.getElementById('statEff').textContent = efficiency + '%';
+
+    renderCharts(catStats, filtered);
+    renderCategoryDetails(catStats, totalHours);
+}
+
+function renderCharts(catStats, records) {
+    const pieCtx = document.getElementById('pieChart').getContext('2d');
+    const barCtx = document.getElementById('barChart').getContext('2d');
+
+    const colors = ['#2563eb', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
+    const labels = Object.keys(catStats);
+    const data = Object.values(catStats);
+
+    if (pieChartInstance) pieChartInstance.destroy();
+    if (barChartInstance) barChartInstance.destroy();
+
+    if (labels.length === 0) {
+        pieCtx.clearRect(0, 0, pieCtx.canvas.width, pieCtx.canvas.height);
+        barCtx.clearRect(0, 0, barCtx.canvas.width, barCtx.canvas.height);
+        return;
+    }
+
+    pieChartInstance = new Chart(pieCtx, {
+        type: 'doughnut',
+        data: {
+            labels: labels,
+            datasets: [{
+                data: data,
+                backgroundColor: colors,
+                borderWidth: 2,
+                borderColor: '#fff'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { position: 'bottom', labels: { padding: 15, font: { size: 12 } } }
+            }
+        }
+    });
+
+    // 按日期聚合
+    const dateStats = {};
+    records.forEach(r => {
+        const d = new Date(r.periodStart).toLocaleDateString('zh-CN', {month:'short', day:'numeric'});
+        const duration = (new Date(r.periodEnd) - new Date(r.periodStart)) / 3600000;
+        dateStats[d] = (dateStats[d] || 0) + duration;
+    });
+    const sortedDates = Object.keys(dateStats).sort();
+
+    barChartInstance = new Chart(barCtx, {
+        type: 'bar',
+        data: {
+            labels: sortedDates,
+            datasets: [{
+                label: '小时',
+                data: sortedDates.map(d => dateStats[d].toFixed(1)),
+                backgroundColor: '#2563eb',
+                borderRadius: 6
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                y: { beginAtZero: true, grid: { color: '#f1f5f9' } },
+                x: { grid: { display: false } }
+            }
+        }
+    });
+}
+
+function renderCategoryDetails(catStats, total) {
+    const container = document.getElementById('categoryDetails');
+    const sorted = Object.entries(catStats).sort((a,b) => b[1]-a[1]);
+
+    container.innerHTML = sorted.map(([cat, hours], i) => {
+        const pct = total > 0 ? ((hours/total)*100).toFixed(1) : 0;
+        const colors = ['#2563eb', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
+        return `
+            <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);">
+                <div style="width:12px;height:12px;border-radius:50%;background:${colors[i%colors.length]};flex-shrink:0;"></div>
+                <div style="flex:1;">
+                    <div style="display:flex;justify-content:space-between;font-weight:500;">
+                        <span>${cat}</span>
+                        <span>${hours.toFixed(1)}h (${pct}%)</span>
+                    </div>
+                    <div style="height:6px;background:var(--bg);border-radius:3px;margin-top:6px;overflow:hidden;">
+                        <div style="height:100%;width:${pct}%;background:${colors[i%colors.length]};border-radius:3px;transition:width 0.5s;"></div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+// ==================== 设置功能 ====================
+function toggleNotify() {
+    state.notifications = document.getElementById('notifyToggle').checked;
+    showToast(state.notifications ? '🔔 提醒已开启' : '🔕 提醒已关闭');
+}
+
+function changeInterval() {
+    state.intervalMinutes = parseInt(document.getElementById('intervalSelect').value);
+    state.nextReminder = getNextReminder();
+    updatePeriodLabel();
+    showToast(`⏱️ 提醒间隔已设为 ${state.intervalMinutes} 分钟`);
+}
+
+function requestNotifyPermission() {
+    if (!('Notification' in window)) {
+        showToast('❌ 当前浏览器不支持通知');
+        return;
+    }
+    Notification.requestPermission().then(permission => {
+        if (permission === 'granted') {
+            showToast('✅ 通知权限已获取');
+            new Notification('时间追踪', { body: '通知测试成功！' });
+        } else {
+            showToast('❌ 通知权限被拒绝');
+        }
+    });
+}
+
+async function exportData(format) {
+    if (isAndroid) { Android.exportData(format); return; }
+    const records = await androidDB.getAllRecords();
+    if (records.length === 0) {
+        showToast('📭 没有数据可导出');
+        return;
+    }
+
+    let content, mime, ext;
+    if (format === 'json') {
+        content = JSON.stringify(records, null, 2);
+        mime = 'application/json';
+        ext = 'json';
+    } else {
+        const headers = ['ID', '开始时间', '结束时间', '记录时间', '分类', '活动'];
+        const rows = records.map(r => [
+            r.id, r.periodStart, r.periodEnd, r.recordedAt, r.category, `"${r.activity.replace(/"/g,'""')}"`
+        ]);
+        content = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+        mime = 'text/csv;charset=utf-8;';
+        ext = 'csv';
+    }
+
+    const blob = new Blob([format==='csv' ? '\uFEFF'+content : content], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `time_tracker_${new Date().toISOString().slice(0,10)}.${ext}`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast(`📥 ${format.toUpperCase()} 导出成功！`);
+}
+
+async function importData(input) {
+    const file = input.files[0];
+    if (!file) return;
+
+    try {
+        const text = await file.text();
+        const records = JSON.parse(text);
+        if (!Array.isArray(records)) throw new Error('格式错误');
+
+        let count = 0;
+        for (const r of records) {
+            if (r.id && r.periodStart && r.activity) {
+                await androidDB.addRecord(r);
+                count++;
+            }
+        }
+        showToast(`📤 成功导入 ${count} 条记录`);
+        loadTodayRecords();
+        loadHistory();
+        updateStats();
+    } catch(e) {
+        showToast('❌ 导入失败：文件格式错误');
+    }
+    input.value = '';
+}
+
+async function clearAllData() {
+    if (!confirm('⚠️ 确定要清空所有数据吗？此操作不可恢复！')) return;
+    if (!confirm('再次确认：真的要删除所有记录吗？')) return;
+
+    const records = await androidDB.getAllRecords();
+    for (const r of records) {
+        await androidDB.deleteRecord(r.id);
+    }
+    showToast('🗑️ 所有数据已清空');
+    loadTodayRecords();
+    loadHistory();
+    updateStats();
+}
+
+// ==================== 页面切换 ====================
+function switchPage(page) {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    document.getElementById(`page-${page}`).classList.add('active');
+    event.currentTarget.classList.add('active');
+
+    if (page === 'analyze') updateStats();
+    if (page === 'history') loadHistory();
+}
+
+// ==================== 工具函数 ====================
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function showToast(msg) {
+    const toast = document.getElementById('toast');
+    toast.textContent = msg;
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 3000);
+}
+
+// ==================== 初始化 ====================
+// Android WebView Bridge
+const isAndroid = typeof Android !== 'undefined';
+
+// 替换 IndexedDB 为 Android SharedPreferences 桥接
+const androidDB = {
+    async getAllRecords() {
+        if (isAndroid) {
+            try { return JSON.parse(Android.getRecords() || '[]'); } catch(e) { return []; }
+        }
+        return [];
+    },
+    async addRecord(record) {
+        if (isAndroid) Android.saveRecord(JSON.stringify(record));
+    },
+    async updateRecord(record) {
+        if (isAndroid) Android.updateRecord(JSON.stringify(record));
+    },
+    async deleteRecord(id) {
+        if (isAndroid) Android.deleteRecord(id);
+    },
+    async clearAll() {
+        if (isAndroid) Android.clearAllData();
+    }
+};
+
+document.addEventListener('DOMContentLoaded', async () => {
+    // Android: 使用 SharedPreferences 替代 IndexedDB
+    if (!isAndroid) await initDB();
+    initCategoryButtons();
+    updatePeriodLabel();
+    state.nextReminder = getNextReminder();
+    state.timerInterval = setInterval(updateCountdown, 1000);
+    loadTodayRecords();
+
+    if ('Notification' in window && Notification.permission === 'default') {
+        setTimeout(() => requestNotifyPermission(), 2000);
+    }
+
+    // 页面可见性变化时重新校准
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) {
+            state.nextReminder = getNextReminder();
+        }
+    });
+});
+
+// Service Worker 注册（支持离线）
+if ('serviceWorker' in navigator) {
+    const swCode = `
+        self.addEventListener('install', e => self.skipWaiting());
+        self.addEventListener('activate', e => e.waitUntil(clients.claim()));
+        self.addEventListener('fetch', e => e.respondWith(fetch(e.request).catch(() => new Response('Offline'))));
+    `;
+    const swBlob = new Blob([swCode], { type: 'application/javascript' });
+    const swUrl = URL.createObjectURL(swBlob);
+    navigator.serviceWorker.register(swUrl).catch(() => {});
+}
+</script>
+</body>
+</html>
